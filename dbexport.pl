@@ -199,11 +199,21 @@ sub generateXML {
 	$writer->dataElement("article-id", $data->{doi}, "pub-id-type" => "doi");
     }
 
-    if ($data->{med} && !$review) {
+    if (($data->{med} && !$review) || ($data->{peer_review} && $data->{peer_review} == 1)) {
 	$writer->startTag("article-categories");
-	$writer->startTag("subj-group");
-	$writer->dataElement("subject", $data->{med});
-	$writer->endTag(); # subj-group
+
+	if ($data->{med} && !$review) {
+	    $writer->startTag("subj-group");
+	    $writer->dataElement("subject", $data->{med});
+	    $writer->endTag(); # subj-group
+	}
+
+	if ($data->{peer_review} && $data->{peer_review} == 1) {
+	    $writer->startTag("subj-group");
+	    $writer->dataElement("subject", "peer-reviewed");
+	    $writer->endTag(); # subj-group
+	}
+
 	$writer->endTag(); # article-categories
     }
 
@@ -311,4 +321,3 @@ sub generateXML {
     $writer->endTag(); # article
     return;
 }
-
