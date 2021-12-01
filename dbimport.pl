@@ -2,10 +2,7 @@
 
 use DBI;
 
-my $db_host = "cpi.acl.org";
-my $db_name = "cpi_data";
-my $db_user = "cpi_data";
-my $db_password = "IL0v3K31th!";
+require("./config.pl");
 
 my %field_map = (
     'Accession' => null,

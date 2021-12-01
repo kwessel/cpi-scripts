@@ -4,10 +4,7 @@ use DBI;
 use IO::File;
 use XML::Writer;
 
-my $db_host = "localhost";
-my $db_name = "cpi_data";
-my $db_user = "cpi_data";
-my $db_password = "IL0v3K31th!";
+require("./config.pl");
 
 my $dbconn = dbInit($db_host, $db_name, $db_user, $db_password);
 
