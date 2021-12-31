@@ -1,6 +1,7 @@
 #!/usr/bin/perl
 
 use DBI;
+use Roman;
 
 require("./config.pl");
 
@@ -74,6 +75,7 @@ while (my $record = getNextRecord($input)) {
 	}
 
 	my $subject_ids;
+	my $scripture_ids;
 	foreach my $s (@{$data->{SUB}}) {
 	    my $subject_id = findSubject($dbconn,$s);
 	    if (!defined($subject_id)) {
@@ -81,9 +83,26 @@ while (my $record = getNextRecord($input)) {
 		$new_subjects++;
 	    }
 	    push (@$subject_ids, $subject_id);
+
+	    if ($foo =~ /^Bible\. ([^,]+)(, )?(([IVXLC]+)(-([IVXLC]+))?)?(, )?([0-9-]+)?(--)?/) {
+		my $book = $1;
+		my $chapter = arabic($4) if (defined($4) && isroman($4));
+		my $chapter .= "-" . arabic($6) if (defined($6) && isroman($6));
+		my $verse = $8;
+		my $c = $book
+		$c .= " " . $chapter if (defined($chapter));
+		$c .= ":" . $verse if (defined($verse));
+		my $scripture_id = findScripture($dbconn,$c);
+		if (!defined($scripture_id)) {
+		    $scripture_id = createScripture($dbconn,$c);
+		    $new_scripture_refs++;
+		}
+		push (@$scripture_ids, $scripture_id);
+	    }
 	}
 
 	insertSubjects($dbconn,$accession,$subject_ids);
+	insertScriptureRefs($dbconn,$accession,$scripture_ids);
 
 	$wrote_count++;
     }
@@ -99,6 +118,7 @@ close $input;
 print "\rRead records: $count\nAdded records: $wrote_count\n";
 
 print "Subjects added: " . $new_subjects . "\n";
+print "Scripture citations added: " . $new_scripture_refs . "\n";
 print "Reviewed authors added: " . $new_reviewed_authors . "\n";
 
 exit 0;
@@ -335,6 +355,40 @@ sub insertSubjects {
 
     if ($#inserts >= 0) {
 	$sth = $dbh->prepare('INSERT INTO subject_instance (record,subject) VALUES ' .
+	    join(',',@inserts));
+	$sth->execute();
+    }
+}
+
+sub findScripture {
+    my ($dbh, $scripture) = @_;
+    my $scripture_id;
+
+    my $sth = $dbh->prepare('SELECT scripture_id FROM scripture WHERE citation LIKE ?');
+    $sth->execute($scripture);
+    $sth->bind_columns(\$scripture_id);
+    $sth->fetch();
+    return $scripture_id;
+}
+
+sub createScripture {
+    my ($dbh, $Scripture) = @_;
+
+    $sth = $dbh->prepare('INSERT INTO scripture set citation=?');
+    $sth->execute($scripture);
+    return $dbh->last_insert_id(undef, undef, undef, undef);
+}
+
+sub insertScriptureRefs {
+    my ($dbh, $accession, $scripture_ids) = @_;
+    my @inserts;
+
+    foreach my $scripture_id (@$scripture_ids) {
+	push (@inserts, '(' . $accession . ',' . $scripture_id . ')');
+    }
+
+    if ($#inserts >= 0) {
+	$sth = $dbh->prepare('INSERT INTO scripture_instance (record,scripture) VALUES ' .
 	    join(',',@inserts));
 	$sth->execute();
     }

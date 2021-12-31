@@ -50,8 +50,10 @@ while ($records->fetch) {
 
     my $subjects = getSubjects($dbconn,$data{accession});
 
+    my $scripture = getScripture($dbconn,$data{accession});
+
     my $xmlobj = initXML();
-    generateXML($xmlobj, \%data, $authors, $subjects);
+    generateXML($xmlobj, \%data, $authors, $subjects, $scripture);
     $xmlobj->end();
 
     print $output $xmlobj;
@@ -137,6 +139,20 @@ sub getSubjects {
     return $subjects;
 }
 
+sub getScripture {
+    my ($dbh, $accession) = @_;
+    my $val;
+    my $scripture;
+
+    my $sth = $dbh->prepare("SELECT UPPER(citation) FROM scripture,scripture_instance WHERE scripture_id = scripture AND record = ?");
+    $sth->execute($accession);
+    $sth->bind_columns(\$val);
+
+    push (@$scripture, $val) while ($sth->fetch);
+
+    return $scripture;
+}
+
 sub markRecordsAsExported {
     my ($dbh, $on_or_after) = @_;
     #my $date_filter = " AND (updated > last_exported OR last_exported IS NULL)";
@@ -156,7 +172,7 @@ sub initXML {
 }
 
 sub generateXML {
-    my ($writer, $data, $authors, $subjects) = @_;
+    my ($writer, $data, $authors, $subjects, $scripture) = @_;
 
     my $review = ($data->{type} eq "REVIEW");
     my @article_attrs = ();
@@ -297,6 +313,14 @@ sub generateXML {
 	$writer->startTag("kwd-group", "kwd-group-type" => "lcsh", "xml:lang" => "en");
 	foreach my $subj (@$subjects) {
 	    $writer->dataElement("kwd", $subj);
+	}
+	$writer->endTag(); # kwd-group
+    }
+
+    if ($#{$scripture} >= 0) {
+	$writer->startTag("kwd-group", "kwd-group-type" => "scripture citation", "xml:lang" => "en");
+	foreach my $citation (@$scripture) {
+	    $writer->dataElement("kwd", $citation);
 	}
 	$writer->endTag(); # kwd-group
     }
