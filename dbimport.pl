@@ -20,6 +20,7 @@ my %field_map = (
     'MED' => 'media',
     'MONTH' => 'month',
     'PAGES' => 'page_range',
+    'PEER_REVIEWED' => 'peer_reviewed',
     'REV' => 'reviewer',
     'SEASON' => 'season',
     'SUB' => null,
@@ -41,6 +42,40 @@ open ($input, $ARGV[0]) or die "Can't read $ARGV[0]: $!\n";
 
 print "Reading records from: $ARGV[0]\n\n";
 
+my $issn_data;
+my @journals_not_found;
+
+print "Scanning for journals\n\n";
+
+while (my $line = <$input>) {
+    chomp $line;
+    if ($line =~ /^JOURNAL (.*)$/) {
+	my $journal = $1;
+	my $data = findISSN($dbconn, $journal);
+	if (defined($data)) {
+	    $issn_data->{$journal} = $data;
+	}
+	else {
+	    push (@journals_not_found, $journal);
+	}
+    }
+}
+
+close $input;
+
+if ($#journals_not_found >= 0) {
+    print "The following " . $#journals_not_found+1 . " journals are missing entries in the ISSN ttable:\n";
+    print join("\n", @journals_not_found) . "\n";
+
+    $dbconn->disconnect() if ($dbconn);
+    close $input;
+    exit 1;
+}
+
+print "Found " . keys(%$issn_data) . " in the input.\n\n";
+
+open ($input, $ARGV[0]) or die "Can't read $ARGV[0]: $!\n";
+
 my $count = 0;
 my $wrote_count = 0;
 my $new_reviewed_authors=0;
@@ -52,7 +87,12 @@ while (my $record = getNextRecord($input)) {
     my $data = parseRecord($record, \%field_map);
 
     if (isValidRecord($data)) {
-	$data->{ISSN} = findISSN($dbconn,$data->{JOURNAL}) if (!$data->{ISSN} && $data->{JOURNAL});
+	$data->{ISSN} = $issn_data->{$data->{JOURNAL}}->{issn} if (!$data->{ISSN});
+
+	my $type = $data->{TYPE};
+	$data->{TYPE} = $issn_data->{$data->{JOURNAL}}->{pub_type} . " " . $type;
+
+	$data->{PEER_REVIEWED} = $issn_data->{$data->{JOURNAL}}->{peer_reviewed};
 
 	my $accession = insertRecord($dbconn, $data, \%field_map);
 
@@ -89,7 +129,7 @@ while (my $record = getNextRecord($input)) {
 		my $chapter = arabic($4) if (defined($4) && isroman($4));
 		my $chapter .= "-" . arabic($6) if (defined($6) && isroman($6));
 		my $verse = $8;
-		my $c = $book
+		my $c = $book;
 		$c .= " " . $chapter if (defined($chapter));
 		$c .= ":" . $verse if (defined($verse));
 		my $scripture_id = findScripture($dbconn,$c);
@@ -396,14 +436,13 @@ sub insertScriptureRefs {
 
 sub findISSN {
     my ($dbh, $journal) = @_;
-    my $issn;
 
     $journal =~ s/\\/\\\\/g;
     $journal =~ s/"/\\"/g;
-    my $sth = $dbh->prepare('SELECT issn FROM issn WHERE journal LIKE ?');
+    my $sth = $dbh->prepare('SELECT issn,pub_type,peer_reviewed FROM issn WHERE journal LIKE ?');
     $sth->execute($journal);
-    $sth->bind_columns(\$issn);
-    $sth->fetch();
-    return $issn;
+    #$sth->bind_columns( \( @data{ @{$sth->{NAME_lc} } } ));
+    #$sth->fetch();
+    return $sth->fetchrow_hashref();
 }
 
