@@ -20,7 +20,7 @@ my %field_map = (
     'MED' => 'media',
     'MONTH' => 'month',
     'PAGES' => 'page_range',
-    'PEER_REVIEWED' => 'peer_reviewed',
+    'PEER_REVIEW' => 'peer_review',
     'REV' => 'reviewer',
     'SEASON' => 'season',
     'SUB' => null,
@@ -29,6 +29,89 @@ my %field_map = (
     'URL' => 'url',
     'VOL' => 'volume',
     'YEAR' => 'year'
+);
+
+my @canon = (
+    "Genesis",
+    "Exodus",
+    "Leviticus",
+    "Numbers",
+    "Deuteronomy",
+    "Joshua",
+    "Judges",
+    "Ruth",
+    "1 Samuel",
+    "2 Samuel",
+    "1 Kings",
+    "2 Kings",
+    "1 Chronicles",
+    "2 Chronicles",
+    "Ezra",
+    "Nehemiah",
+    "Tobit",
+    "Judith",
+    "Esther",
+    "1 Maccabees",
+    "2 Maccabees",
+    "3 Maccabees",
+    "4 Maccabees",
+    "Job",
+    "Psalms",
+    "Prayer of Manasseh",
+    "1 Esdras",
+    "2 Esdras",
+    "3 Esdras",
+    "4 Esdras",
+    "Proverbs",
+    "Ecclesiastes",
+    "Song of Solomon",
+    "Wisdom of Solomon",
+    "Ecclesiasticus",
+    "Isaiah",
+    "Jeremiah",
+    "Lamentations",
+    "Baruch",
+    "Ezekiel",
+    "Daniel",
+    "Hosea",
+    "Joel",
+    "Amos",
+    "Obadiah",
+    "Jonah",
+    "Micah",
+    "Nahum",
+    "Habakkuk",
+    "Zephaniah",
+    "Haggai",
+    "Zechariah",
+    "Malachi",
+    "Matthew",
+    "Mark",
+    "Luke",
+    "John",
+    "Acts",
+    "Romans",
+    "1 Corinthians",
+    "2 Corinthians",
+    "Galatians",
+    "Ephesians",
+    "Philippians",
+    "Colossians",
+    "1 Thessalonians",
+    "2 Thessalonians",
+    "1 Timothy",
+    "2 Timothy",
+    "Titus",
+    "Philemon",
+    "Hebrews",
+    "James",
+    "1 Peter",
+    "2 Peter",
+    "1 John",
+    "2 John",
+    "3 John",
+    "Jude",
+    "Revelation"
 );
 
 my $dbconn = dbInit($db_host, $db_name, $db_user, $db_password);
@@ -80,6 +163,7 @@ my $count = 0;
 my $wrote_count = 0;
 my $new_reviewed_authors=0;
 my $new_subjects=0;
+my $new_scripture_refs=0;
 $| = 1;
 
 while (my $record = getNextRecord($input)) {
@@ -92,11 +176,11 @@ while (my $record = getNextRecord($input)) {
 	my $type = $data->{TYPE};
 	$data->{TYPE} = $issn_data->{$data->{JOURNAL}}->{pub_type} . " " . $type;
 
-	$data->{PEER_REVIEWED} = $issn_data->{$data->{JOURNAL}}->{peer_reviewed};
+	$data->{PEER_REVIEW} = $issn_data->{$data->{JOURNAL}}->{peer_review};
 
 	my $accession = insertRecord($dbconn, $data, \%field_map);
 
-	if ($data->{TYPE} eq "JOURNAL ARTICLE") {
+	if ($data->{TYPE} eq "ARTICLE") {
 	    insertArticleAuthors($dbconn,$accession,$data->{AU});
 	}
 	elsif ($data->{TYPE} eq "REVIEW") {
@@ -124,20 +208,25 @@ while (my $record = getNextRecord($input)) {
 	    }
 	    push (@$subject_ids, $subject_id);
 
-	    if ($foo =~ /^Bible\. ([^,]+)(, )?(([IVXLC]+)(-([IVXLC]+))?)?(, )?([0-9-]+)?(--)?/) {
-		my $book = $1;
-		my $chapter = arabic($4) if (defined($4) && isroman($4));
-		my $chapter .= "-" . arabic($6) if (defined($6) && isroman($6));
-		my $verse = $8;
-		my $c = $book;
-		$c .= " " . $chapter if (defined($chapter));
-		$c .= ":" . $verse if (defined($verse));
-		my $scripture_id = findScripture($dbconn,$c);
-		if (!defined($scripture_id)) {
-		    $scripture_id = createScripture($dbconn,$c);
-		    $new_scripture_refs++;
+	    if ($s =~ /^Bible\. ([^,]+)(, )?(([1-4])[snrt][tdh])?(, )?(([IVXLC]+)(-([IVXLC]+))?)?(, )?(([0-9]+(-[0-9]+)?))?(--)?/) {
+		my $book;
+		$book = $4 . " " if (defined($3));
+		$book .= $1;
+
+		if (grep (/^$book$/, @canon)) {
+		    my $chapter = arabic($7) if (defined($7) && isroman($7));
+		    $chapter .= "-" . arabic($9) if (defined($9) && isroman($9));
+		    my $verse = $11;
+		    my $c = $book;
+		    $c .= " " . $chapter if (defined($chapter));
+		    $c .= ":" . $verse if (defined($verse));
+		    my $scripture_id = findScripture($dbconn,$c);
+		    if (!defined($scripture_id)) {
+			$scripture_id = createScripture($dbconn,$c);
+			$new_scripture_refs++;
+		    }
+		    push (@$scripture_ids, $scripture_id);
 		}
-		push (@$scripture_ids, $scripture_id);
 	    }
 	}
 
@@ -201,6 +290,9 @@ sub parseRecord {
 	    if ($key eq "Accession") {
 		$val =~ s/^no\. //;
 	    }
+	    elsif ($key eq "TYPE") {
+		$val =~ s/^JOURNAL //;
+	    }
 	    elsif ($key eq "MONTH" && !isMonth($val)) {
 		$key = "SEASON";
 	    }
@@ -233,7 +325,7 @@ sub parseRecord {
 sub isValidRecord {
     my ($data) = @_;
 
-    return (($data->{TYPE} eq "JOURNAL ARTICLE" || $data->{TYPE} eq "REVIEW")
+    return (($data->{TYPE} eq "ARTICLE" || $data->{TYPE} eq "REVIEW")
 	&& $data->{TI} && $data->{YEAR} && $data->{JOURNAL});
 }
 
@@ -412,7 +504,7 @@ sub findScripture {
 }
 
 sub createScripture {
-    my ($dbh, $Scripture) = @_;
+    my ($dbh, $scripture) = @_;
 
     $sth = $dbh->prepare('INSERT INTO scripture set citation=?');
     $sth->execute($scripture);
@@ -439,7 +531,7 @@ sub findISSN {
 
     $journal =~ s/\\/\\\\/g;
     $journal =~ s/"/\\"/g;
-    my $sth = $dbh->prepare('SELECT issn,pub_type,peer_reviewed FROM issn WHERE journal LIKE ?');
+    my $sth = $dbh->prepare('SELECT issn,pub_type,peer_review FROM issn WHERE journal LIKE ?');
     $sth->execute($journal);
     #$sth->bind_columns( \( @data{ @{$sth->{NAME_lc} } } ));
     #$sth->fetch();
