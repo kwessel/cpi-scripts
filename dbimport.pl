@@ -163,7 +163,7 @@ my $count = 0;
 my $wrote_count = 0;
 my $new_reviewed_authors=0;
 my $new_subjects=0;
-my $new_scripture_refs=0;
+my $new_scripture_citations=0;
 $| = 1;
 
 while (my $record = getNextRecord($input)) {
@@ -208,24 +208,29 @@ while (my $record = getNextRecord($input)) {
 	    }
 	    push (@$subject_ids, $subject_id);
 
-	    if ($s =~ /^Bible\. ([^,]+)(, )?(([1-4])[snrt][tdh])?(, )?(([IVXLC]+)(-([IVXLC]+))?)?(, )?(([0-9]+(-[0-9]+)?))?(--)?/) {
+	    if ($s =~ /^Bible\. ([^,]+)(, )?(([1-4])[snrt][tdh])?(, )?(([IVXLC]+)(-([IVXLC]+))?)?(, )?(([0-9]+(-[0-9]+)?))?(--)?/i) {
 		my $book;
 		$book = $4 . " " if (defined($3));
 		$book .= $1;
 
-		if (grep (/^$book$/, @canon)) {
+		if (grep (/^$book$/i, @canon)) {
 		    my $chapter = arabic($7) if (defined($7) && isroman($7));
 		    $chapter .= "-" . arabic($9) if (defined($9) && isroman($9));
 		    my $verse = $11;
 		    my $c = $book;
 		    $c .= " " . $chapter if (defined($chapter));
 		    $c .= ":" . $verse if (defined($verse));
+
 		    my $scripture_id = findScripture($dbconn,$c);
 		    if (!defined($scripture_id)) {
 			$scripture_id = createScripture($dbconn,$c);
-			$new_scripture_refs++;
+			$new_scripture_citations++;
 		    }
-		    push (@$scripture_ids, $scripture_id);
+
+                    my $scripture_instance_id = findScriptureRef($dbconn,$accession,$scripture_id);
+                    if (!defined($scripture_instance_id)) {
+                        push (@$scripture_ids, $scripture_id);
+                    }
 		}
 	    }
 	}
@@ -247,7 +252,7 @@ close $input;
 print "\rRead records: $count\nAdded records: $wrote_count\n";
 
 print "Subjects added: " . $new_subjects . "\n";
-print "Scripture citations added: " . $new_scripture_refs . "\n";
+print "Scripture citations added: " . $new_scripture_citations . "\n";
 print "Reviewed authors added: " . $new_reviewed_authors . "\n";
 
 exit 0;
@@ -509,6 +514,17 @@ sub createScripture {
     $sth = $dbh->prepare('INSERT INTO scripture set citation=?');
     $sth->execute($scripture);
     return $dbh->last_insert_id(undef, undef, undef, undef);
+}
+
+sub findScriptureRef {
+    my ($dbh, $accession, $scripture_id) = @_;
+    my $scripture_instance_id;
+
+    my $sth = $dbh->prepare('SELECT scripture_instance_id FROM scripture_instance WHERE record LIKE ? AND scripture LIKE ?');
+    $sth->execute($accession, $scripture_id);
+    $sth->bind_columns(\$scripture_instance_id);
+    $sth->fetch();
+    return $scripture_instance_id;
 }
 
 sub insertScriptureRefs {

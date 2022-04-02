@@ -91,7 +91,8 @@ my @canon = (
 my $dbconn = dbInit($db_host, $db_name, $db_user, $db_password)
     or die "Cannot connect to $db_host: $DBI::errstr\n";
 
-my $new_scripture_refs=0;
+my $new_scripture_citations=0;
+my $new_scripture_instances=0;
 my $subject_instances=0;
 
 my $records = getSubjects($dbconn);
@@ -121,10 +122,14 @@ while ($records->fetch) {
 	    my $scripture_id = findScripture($dbconn,$c);
 	    if (!defined($scripture_id)) {
 		$scripture_id = createScripture($dbconn,$c);
-		$new_scripture_refs++;
+		$new_scripture_citations++;
 	    }
 
-	    insertScriptureRef($dbconn,$data{record},$scripture_id);
+	    my $scripture_instance_id = findScriptureRef($dbconn,$data{record},$scripture_id);
+	    if (!defined($scripture_instance_id)) {
+                insertScriptureRef($dbconn,$data{record},$scripture_id);
+		$new_scripture_instances++;
+            }
 	}
     }
     $count++;
@@ -135,7 +140,8 @@ print "\n\n";
 $dbconn->disconnect() if ($dbconn);
 
 print "Subject instances with scripture citations: " . $subject_instances . "\n";
-print "Scripture citations added: " . $new_scripture_refs . "\n";
+print "Scripture citations added: " . $new_scripture_citations . "\n";
+print "Scripture citation instances added: " . $new_scripture_instances . "\n";
 exit 0;
 
 sub dbInit {
@@ -174,6 +180,17 @@ sub createScripture {
     $sth = $dbh->prepare('INSERT INTO scripture set citation=?');
     $sth->execute($scripture);
     return $dbh->last_insert_id(undef, undef, undef, undef);
+}
+
+sub findScriptureRef {
+    my ($dbh, $accession, $scripture_id) = @_;
+    my $scripture_instance_id;
+
+    my $sth = $dbh->prepare('SELECT scripture_instance_id FROM scripture_instance WHERE record LIKE ? AND scripture LIKE ?');
+    $sth->execute($accession, $scripture_id);
+    $sth->bind_columns(\$scripture_instance_id);
+    $sth->fetch();
+    return $scripture_instance_id;
 }
 
 sub insertScriptureRef {
