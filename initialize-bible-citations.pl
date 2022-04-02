@@ -103,14 +103,14 @@ my $count = 0;
 $| = 1;
 
 while ($records->fetch) {
-    print "\rConsidering subject instances: $count" if ($count%100 == 0);
+    print "\rConsidering Bible subject instances: $count" if ($count%100 == 0);
 
-    if ($data{keyword} =~ /^Bible\. ([^,]+)(, )?(([1-4])[snrt][tdh])?(, )?(([IVXLC]+)(-([IVXLC]+))?)?(, )?(([0-9]+(-[0-9]+)?))?(--)?/) {
+    if ($data{keyword} =~ /^Bible\. ([^,]+)(, )?(([1-4])[snrt][tdh])?(, )?(([IVXLC]+)(-([IVXLC]+))?)?(, )?(([0-9]+(-[0-9]+)?))?(--)?/i) {
 	my $book;
 	$book = $4 . " " if (defined($3));
 	$book .= $1;
 
-	if (grep (/^$book$/, @canon)) {
+	if (grep (/^$book$/i, @canon)) {
 	    $subject_instances++;
 	    my $chapter = arabic($7) if (defined($7) && isroman($7));
 	    $chapter .= "-" . arabic($9) if (defined($9) && isroman($9));
@@ -143,7 +143,7 @@ sub dbInit {
 
     my $dsn = "DBI:mysql:database=$db;host=$host";
     my $dbh = DBI->connect($dsn, $user, $pw,
-	{ RaiseError => 1, mysql_auto_reconnect => 1, RowCacheSize => 1000 });
+	{ RaiseError => 1, mysql_auto_reconnect => 1 });
 
     return $dbh;
 }
@@ -151,7 +151,7 @@ sub dbInit {
 sub getSubjects {
     my ($dbh) = @_;
 
-    my $sth = $dbh->prepare("select record,keyword from subject_instance,subject where keyword like 'Bible. %'");
+    my $sth = $dbh->prepare("select record,keyword from subject_instance,subject where subject_id = subject and keyword like 'Bible. %';");
     $sth->execute();
 
     return $sth;
