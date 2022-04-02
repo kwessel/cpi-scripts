@@ -88,7 +88,8 @@ my @canon = (
     "Revelation"
 );
 
-my $dbconn = dbInit($db_host, $db_name, $db_user, $db_password);
+my $dbconn = dbInit($db_host, $db_name, $db_user, $db_password)
+    or die "Cannot connect to $db_host: $DBI::errstr\n";
 
 my $new_scripture_refs=0;
 my $subject_instances=0;
@@ -142,7 +143,7 @@ sub dbInit {
 
     my $dsn = "DBI:mysql:database=$db;host=$host";
     my $dbh = DBI->connect($dsn, $user, $pw,
-	{ RaiseError => 1, mysql_auto_reconnect => 1});
+	{ RaiseError => 1, mysql_auto_reconnect => 1, RowCacheSize => 1000 });
 
     return $dbh;
 }
