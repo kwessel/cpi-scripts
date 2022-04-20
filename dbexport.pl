@@ -41,17 +41,19 @@ print $output "<?xml version=\"1.0\" encoding=\"UTF-8\">\n";
 while ($records->fetch) {
     print "\rExported records: $count" if ($count%100 == 0);
     my $authors;
-    if ($data{type} eq "REVIEW") {
+    if ($data{type} =~ /REVIEW$/) {
 	$authors = getReviewedAuthors($dbconn,$data{accession});
     }
-    elsif ($data{type} eq "JOURNAL ARTICLE") {
+    else {
 	$authors = getAuthors($dbconn,$data{accession});
     }
 
     my $subjects = getSubjects($dbconn,$data{accession});
 
+    my $scripture = getScripture($dbconn,$data{accession});
+
     my $xmlobj = initXML();
-    generateXML($xmlobj, \%data, $authors, $subjects);
+    generateXML($xmlobj, \%data, $authors, $subjects, $scripture);
     $xmlobj->end();
 
     print $output $xmlobj;
@@ -137,6 +139,20 @@ sub getSubjects {
     return $subjects;
 }
 
+sub getScripture {
+    my ($dbh, $accession) = @_;
+    my $val;
+    my $scripture;
+
+    my $sth = $dbh->prepare("SELECT UPPER(citation) FROM scripture,scripture_instance WHERE scripture_id = scripture AND record = ?");
+    $sth->execute($accession);
+    $sth->bind_columns(\$val);
+
+    push (@$scripture, $val) while ($sth->fetch);
+
+    return $scripture;
+}
+
 sub markRecordsAsExported {
     my ($dbh, $on_or_after) = @_;
     #my $date_filter = " AND (updated > last_exported OR last_exported IS NULL)";
@@ -156,9 +172,9 @@ sub initXML {
 }
 
 sub generateXML {
-    my ($writer, $data, $authors, $subjects) = @_;
+    my ($writer, $data, $authors, $subjects, $scripture) = @_;
 
-    my $review = ($data->{type} eq "REVIEW");
+    my $review = ($data->{type} =~ /REVIEW$/);
     my @article_attrs = ();
     my $product_attrs;
 
@@ -174,7 +190,7 @@ sub generateXML {
 
     push (@article_attrs, "dtd-version" => "1.2d2");
 
-    $writer->startTag("article", @article_attrs);
+    $writer->startTag("article", "article-type" => $data->{type}, "dtd-version" => "1.2d2");
     $writer->startTag("front");
 
     if ($data->{journal} || $data->{issn}) {
@@ -297,6 +313,14 @@ sub generateXML {
 	$writer->startTag("kwd-group", "kwd-group-type" => "lcsh", "xml:lang" => "en");
 	foreach my $subj (@$subjects) {
 	    $writer->dataElement("kwd", $subj);
+	}
+	$writer->endTag(); # kwd-group
+    }
+
+    if ($#{$scripture} >= 0) {
+	$writer->startTag("kwd-group", "kwd-group-type" => "scripture citation", "xml:lang" => "en");
+	foreach my $citation (@$scripture) {
+	    $writer->dataElement("kwd", $citation);
 	}
 	$writer->endTag(); # kwd-group
     }
