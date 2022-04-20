@@ -190,7 +190,7 @@ sub generateXML {
 
     push (@article_attrs, "dtd-version" => "1.2d2");
 
-    $writer->startTag("article", "article-type" => $data->{type}, "dtd-version" => "1.2d2");
+    $writer->startTag("article", @article_attrs);
     $writer->startTag("front");
 
     if ($data->{journal} || $data->{issn}) {
@@ -215,21 +215,11 @@ sub generateXML {
 	$writer->dataElement("article-id", $data->{doi}, "pub-id-type" => "doi");
     }
 
-    if (($data->{med} && !$review) || ($data->{peer_review} && $data->{peer_review} == 1)) {
+    if (($data->{med} && !$review)) {
 	$writer->startTag("article-categories");
-
-	if ($data->{med} && !$review) {
 	    $writer->startTag("subj-group");
 	    $writer->dataElement("subject", $data->{med});
 	    $writer->endTag(); # subj-group
-	}
-
-	if ($data->{peer_review} && $data->{peer_review} == 1) {
-	    $writer->startTag("subj-group");
-	    $writer->dataElement("subject", "peer-reviewed");
-	    $writer->endTag(); # subj-group
-	}
-
 	$writer->endTag(); # article-categories
     }
 
@@ -313,14 +303,6 @@ sub generateXML {
 	$writer->startTag("kwd-group", "kwd-group-type" => "lcsh", "xml:lang" => "en");
 	foreach my $subj (@$subjects) {
 	    $writer->dataElement("kwd", $subj);
-	}
-	$writer->endTag(); # kwd-group
-    }
-
-    if ($#{$scripture} >= 0) {
-	$writer->startTag("kwd-group", "kwd-group-type" => "scripture citation", "xml:lang" => "en");
-	foreach my $citation (@$scripture) {
-	    $writer->dataElement("kwd", $citation);
 	}
 	$writer->endTag(); # kwd-group
     }
