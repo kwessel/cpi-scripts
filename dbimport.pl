@@ -174,16 +174,15 @@ while (my $record = getNextRecord($input)) {
 	$data->{ISSN} = $issn_data->{$data->{JOURNAL}}->{issn} if (!$data->{ISSN});
 
 	my $type = $data->{TYPE};
+        my $is_review = 0;
+        $is_review = 1 if ($type eq "REVIEW");
 	$data->{TYPE} = $issn_data->{$data->{JOURNAL}}->{pub_type} . " " . $type;
 
 	$data->{PEER_REVIEW} = $issn_data->{$data->{JOURNAL}}->{peer_review};
 
 	my $accession = insertRecord($dbconn, $data, \%field_map);
 
-	if ($data->{TYPE} eq "ARTICLE") {
-	    insertArticleAuthors($dbconn,$accession,$data->{AU});
-	}
-	elsif ($data->{TYPE} eq "REVIEW") {
+	if ($is_review) {
 	    my $author_ids;
 
 	    foreach my $a (@{$data->{AU}}) {
@@ -196,6 +195,9 @@ while (my $record = getNextRecord($input)) {
 	    }
 
 	    insertReviewedAuthors($dbconn,$accession,$author_ids);
+	}
+	else {
+	    insertArticleAuthors($dbconn,$accession,$data->{AU});
 	}
 
 	my $subject_ids;
