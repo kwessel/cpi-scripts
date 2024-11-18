@@ -176,13 +176,11 @@ sub generateXML {
 
     my $review = ($data->{type} =~ /REVIEW$/);
 
-    if ($review) {
-	if ($data->{media}) {
-	    $product_type = $data->{media};
-	}
-	else {
-	    $product_type = "book";
-	}
+    if ($data->{media}) {
+        $product_type = $data->{media};
+    }
+    elsif ($review) {
+        $product_type = "book";
     }
 
     $writer->startTag("article", "article-type" => $data->{type}, "dtd-version" => "1.2d2");
@@ -286,9 +284,11 @@ sub generateXML {
 	$writer->dataElement("page-range", $data->{page_range});
     }
 
-    if ($review) {
+    if (defined($product_type)) {
 	$writer->startTag("product", "product-type" => $product_type);
+    }
 
+    if ($review) {
 	if ($data->{title}) {
 	    $writer->dataElement("source", $data->{title});
 	}
