@@ -175,11 +175,8 @@ sub generateXML {
     my ($writer, $data, $authors, $subjects, $scripture) = @_;
 
     my $review = ($data->{type} =~ /REVIEW$/);
-    my @article_attrs = ();
-    my $product_attrs;
 
     if ($review) {
-	push (@article_attrs, "article-type" => "review");
 	if ($data->{media}) {
 	    $product_type = $data->{media};
 	}
@@ -187,8 +184,6 @@ sub generateXML {
 	    $product_type = "book";
 	}
     }
-
-    push (@article_attrs, "dtd-version" => "1.2d2");
 
     $writer->startTag("article", "article-type" => $data->{type}, "dtd-version" => "1.2d2");
     $writer->startTag("front");
