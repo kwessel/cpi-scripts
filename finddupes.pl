@@ -36,8 +36,8 @@ my %field_map = (
 
 my $dbconn = dbInit($db_host, $db_name, $db_user, $db_password);
 
-if ($#ARGV != 1) {
-    print "Usage: $0 <input_file> <missing_records_output_file>\n";
+if ($#ARGV != 3) {
+    print "Usage: $0 <input_file> <new_records_output_file> <duplicate_records_output_file> <invalid_records_output_file>\n";
     exit 1;
 }
 
@@ -48,22 +48,50 @@ if (-f $ARGV[1]) {
     exit 1;
 }
 
-open ($output, ">".$ARGV[1]) or die "Can't write to $ARGV[1]: $!\n";
+if (-f $ARGV[2]) {
+    print "$ARGV[2] already exists and I won't overwrite it. Please remove or rename it.\n";
+    exit 1;
+}
 
-print "Reading records from: $ARGV[0]\n\n";
+if (-f $ARGV[3]) {
+    print "$ARGV[3] already exists and I won't overwrite it. Please remove or rename it.\n";
+    exit 1;
+}
+
+open ($good_output, ">".$ARGV[1]) or die "Can't write to $ARGV[1]: $!\n";
+open ($bad_output, ">".$ARGV[2]) or die "Can't write to $ARGV[2]: $!\n";
+open ($ugly_output, ">".$ARGV[3]) or die "Can't write to $ARGV[3]: $!\n";
+
+print "Reading records from: $ARGV[0]\n";
+print "Writing new records to: $ARGV[1]\n";
+print "Writing duplicate records to: $ARGV[2]\n";
+print "Writing invalid records to: $ARGV[3]\n";
+print "\n";
 
 my $count = 0;
-my $wrote_count = 0;
+my $good_count = 0;
+my $bad_count = 0;
+my $ugly_count = 0;
 $| = 1;
 
 while (my $record = getNextRecord($input)) {
     print "\rRead records: $count" if ($count%10 == 0);
     my $data = parseRecord($record, \%field_map);
 
-    if (isValidRecord($data) && !findRecord($dbconn, $data, \%field_map)) {
-        print $output "\$\n" if ($wrote_count == 0);
-        print $output $record . "\$\n";
-	$wrote_count++;
+    if (!isValidRecord($data)) {
+        print $ugly_output "\$\n" if ($ugly_count == 0);
+        print $ugly_output $record . "\$\n";
+	$ugly_count++;
+    }
+    elsif (findRecord($dbconn, $data, \%field_map)) {
+        print $bad_output "\$\n" if ($bad_count == 0);
+        print $bad_output $record . "\$\n";
+	$bad_count++;
+    }
+    else {
+        print $good_output "\$\n" if ($good_count == 0);
+        print $good_output $record . "\$\n";
+	$good_count++;
     }
     
     undef $data;
@@ -73,10 +101,18 @@ while (my $record = getNextRecord($input)) {
 
 $dbconn->disconnect() if ($dbconn);
 close $input;
-close $output;
-unlink $ARGV[1] if ($wrote_count == 0);
+close $good_output;
+close $bad_output;
+close $ugly_output;
+unlink $ARGV[1] if ($good_count == 0);
+unlink $ARGV[2] if ($bad_count == 0);
+unlink $ARGV[3] if ($ugly_count == 0);
 
-print "\rRead records: $count\nFound missing records: $wrote_count\n";
+print "\r";
+print "Read records: $count\n";
+print "Found inbalid records: $ugly_count\n";
+print "Found duplicate records: $bad_count\n";
+print "Found new records: $good_count\n";
 
 exit 0;
 
