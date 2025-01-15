@@ -175,15 +175,24 @@ sub generateXML {
     my ($writer, $data, $authors, $subjects, $scripture) = @_;
 
     my $review = ($data->{type} =~ /REVIEW$/);
+    my @article_attrs = (
+        "article-type" => $data->{type},
+        "dtd-version" => "1.2d2"
+    );
 
-    if ($data->{media}) {
-        $product_type = $data->{media};
+    if ($review) {
+	if ($data->{media}) {
+	    $product_type = $data->{media};
+	}
+	else {
+	    $product_type = "book";
+	}
     }
-    elsif ($review) {
-        $product_type = "book";
+    elsif ($data->{media}) {
+        push (@article_attrs, "format" => $data->{media});
     }
 
-    $writer->startTag("article", "article-type" => $data->{type}, "dtd-version" => "1.2d2");
+    $writer->startTag("article", @article_attrs);
     $writer->startTag("front");
 
     if ($data->{journal} || $data->{issn}) {
@@ -284,11 +293,9 @@ sub generateXML {
 	$writer->dataElement("page-range", $data->{page_range});
     }
 
-    if (defined($product_type)) {
-	$writer->startTag("product", "product-type" => $product_type);
-    }
-
     if ($review) {
+	$writer->startTag("product", "product-type" => $product_type);
+
 	if ($data->{title}) {
 	    $writer->dataElement("source", $data->{title});
 	}
