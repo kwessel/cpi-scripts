@@ -129,7 +129,7 @@ open ($input, $ARGV[0]) or die "Can't read $ARGV[0]: $!\n";
 print "Reading records from: $ARGV[0]\n\n";
 
 my $issn_data;
-my @journals_not_found;
+my $journals_not_found;
 
 print "Scanning for journals\n\n";
 
@@ -142,23 +142,38 @@ while (my $line = <$input>) {
 	    $issn_data->{$journal} = $data;
 	}
 	else {
-	    push (@journals_not_found, $journal);
+	    $journals_not_found->{$journal}++;
 	}
     }
 }
 
 close $input;
 
-if ($#journals_not_found >= 0) {
-    print "The following " . $#journals_not_found+1 . " journals are missing entries in the ISSN ttable:\n";
-    print join("\n", @journals_not_found) . "\n";
+if (keys(%$journals_not_found) > 0) {
+    if (keys(%$journals_not_found) == 1) {
+        print "The following journal is missing an entry in the ISSN ttable:\n";
+    }
+    else {
+        print "The following " . keys(%$journals_not_found) . " journals are missing entries in the ISSN ttable:\n";
+    }
+
+    foreach my $j (keys(%$journals_not_found)) {
+        my $times = $journals_not_found->{$j};
+        print "$j ($times record";
+        print "s" if ($times > 1);
+        print ")\n";
+    }
 
     $dbconn->disconnect() if ($dbconn);
     close $input;
     exit 1;
 }
 
-print "Found " . keys(%$issn_data) . " in the input.\n\n";
+if (keys(%$issn_data) == 1) {
+    print "Found 1 journal in the input.\n\n";
+} else {
+    print "Found " . keys(%$issn_data) . " journals in the input.\n\n";
+}
 
 open ($input, $ARGV[0]) or die "Can't read $ARGV[0]: $!\n";
 

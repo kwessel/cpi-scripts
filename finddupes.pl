@@ -58,15 +58,63 @@ if (-f $ARGV[3]) {
     exit 1;
 }
 
-open ($good_output, ">".$ARGV[1]) or die "Can't write to $ARGV[1]: $!\n";
-open ($bad_output, ">".$ARGV[2]) or die "Can't write to $ARGV[2]: $!\n";
-open ($ugly_output, ">".$ARGV[3]) or die "Can't write to $ARGV[3]: $!\n";
-
 print "Reading records from: $ARGV[0]\n";
 print "Writing new records to: $ARGV[1]\n";
 print "Writing duplicate records to: $ARGV[2]\n";
 print "Writing invalid records to: $ARGV[3]\n";
 print "\n";
+
+my $issn_data;
+my $journals_not_found;
+
+print "Scanning for journals\n\n";
+
+while (my $line = <$input>) {
+    chomp $line;
+    if ($line =~ /^JOURNAL (.*)$/) {
+	my $journal = $1;
+	my $data = findISSN($dbconn, $journal);
+	if (defined($data)) {
+	    $issn_data->{$journal} = $data;
+	}
+	else {
+	    $journals_not_found->{$journal}++;
+	}
+    }
+}
+
+close $input;
+
+if (keys(%$journals_not_found) > 0) {
+    if (keys(%$journals_not_found) == 1) {
+        print "The following journal is missing an entry in the ISSN ttable:\n";
+    }
+    else {
+        print "The following " . keys(%$journals_not_found) . " journals are missing entries in the ISSN ttable:\n";
+    }
+
+    foreach my $j (keys(%$journals_not_found)) {
+        my $times = $journals_not_found->{$j};
+        print "$j ($times record";
+        print "s" if ($times > 1);
+        print ")\n";
+    }
+
+    $dbconn->disconnect() if ($dbconn);
+    close $input;
+    exit 1;
+}
+
+if (keys(%$issn_data) == 1) {
+    print "Found 1 journal in the input.\n\n";
+} else {
+    print "Found " . keys(%$issn_data) . " journals in the input.\n\n";
+}
+
+open ($input, $ARGV[0]) or die "Can't read $ARGV[0]: $!\n";
+open ($good_output, ">".$ARGV[1]) or die "Can't write to $ARGV[1]: $!\n";
+open ($bad_output, ">".$ARGV[2]) or die "Can't write to $ARGV[2]: $!\n";
+open ($ugly_output, ">".$ARGV[3]) or die "Can't write to $ARGV[3]: $!\n";
 
 my $count = 0;
 my $good_count = 0;
@@ -263,5 +311,17 @@ sub findRecord {
     $sth->bind_columns(\$accession);
     $sth->fetch();
     return $accession;
+}
+
+sub findISSN {
+    my ($dbh, $journal) = @_;
+
+    $journal =~ s/\\/\\\\/g;
+    $journal =~ s/"/\\"/g;
+    my $sth = $dbh->prepare('SELECT issn,pub_type,peer_review FROM issn WHERE journal LIKE ?');
+    $sth->execute($journal);
+    #$sth->bind_columns( \( @data{ @{$sth->{NAME_lc} } } ));
+    #$sth->fetch();
+    return $sth->fetchrow_hashref();
 }
 
