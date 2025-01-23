@@ -126,7 +126,7 @@ while (my $record = getNextRecord($input)) {
     print "\rRead records: $count" if ($count%10 == 0);
     my $data = parseRecord($record, \%field_map);
 
-    if (!isValidRecord($data)) {
+    if ($record =~ /[^\x00-\x7f]/ || !isValidRecord($data)) {
         print $ugly_output "\$\n" if ($ugly_count == 0);
         print $ugly_output $record . "\$\n";
 	$ugly_count++;
