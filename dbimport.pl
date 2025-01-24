@@ -3,7 +3,10 @@
 use DBI;
 use Roman;
 
-require("./config.pl");
+my $path = $0;
+$path =~ s|[^/]+$||;
+$path = "./" . $path if ($path !~ m|^/|);
+require("$path/config.pl");
 
 my %field_map = (
     'Accession' => null,

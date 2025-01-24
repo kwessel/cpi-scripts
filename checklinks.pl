@@ -3,7 +3,10 @@
 use DBI;
 use LWP::UserAgent;
 
-require("./config.pl");
+my $path = $0;
+$path =~ s|[^/]+$||;
+$path = "./" . $path if ($path !~ m|^/|);
+require("$path/config.pl");
 
 my $bad_links=0;
 
