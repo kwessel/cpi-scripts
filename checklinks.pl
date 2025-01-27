@@ -27,6 +27,7 @@ print $output '"Accession","Title","URL"' . "\n";
 print "Writing records to: $ARGV[0]\n\n";
 
 my $records = getURLs($dbconn);
+my $total = $records->rows();
 
 my %data;
 $records->bind_columns( \( @data{ @{$records->{NAME_lc} } } ));
@@ -36,24 +37,24 @@ $| = 1;
 
 my $ua = LWP::UserAgent->new(timeout => 3);
 while ($records->fetch) {
-    #print "\rChecking records with URLs: $count" if ($count%100 == 0);
-    print "\rChecking records with URLs: $count";
+    print "\rChecking records with URLs: $count of $total";
 
     #print "checking $data{url}\n";
     my $resp = $ua->get($data{url});
     #print "Response: " . $resp->code . "\n";
     if (!$resp->is_success) {
         print $output '"' . $data{accession} . '","' . $data{title} . '","' . $data{url} . '"' . "\n";
-            }
+        $bad_links++;
+    }
 
     $count++;
 }
-print "\n\n";
-
 $dbconn->disconnect() if ($dbconn);
 $output->close;
 
-print "Stale links found: " . $bad_links . "\n";
+unlink($ARGV[0]) if ($bad_links == 0);
+
+print "\rLinks checked: $count\nStale links found: " . $bad_links . "\n";
 exit 0;
 
 sub dbInit {
