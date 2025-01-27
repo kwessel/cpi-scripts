@@ -4,7 +4,10 @@ use DBI;
 use IO::File;
 use XML::Writer;
 
-require("./config.pl");
+my $path = $0;
+$path =~ s|[^/]+$||;
+$path = "./" . $path if ($path !~ m|^/|);
+require("$path/config.pl");
 
 my $dbconn = dbInit($db_host, $db_name, $db_user, $db_password);
 
