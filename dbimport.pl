@@ -110,9 +110,9 @@ my @canon = (
     "James",
     "1 Peter",
     "2 Peter",
-    "1 John",
-    "2 John",
-    "3 John",
+    "Epistle of John, 1st",
+    "Epistle of John, 2nd",
+    "Epistle of John, 3rd",
     "Jude",
     "Revelation"
 );
